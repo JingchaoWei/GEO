@@ -30,43 +30,38 @@ if(F){
 
 load(file='GSE11121_raw_exprSet.Rdata') 
 exprSet=raw_exprSet
-library(hgu133a.db) 
-ids=toTable(hgu133aSYMBOL)
+rm(raw_exprSet)
+
+library(GEOquery)
+gset <- getGEO("GSE11121",destdir = ".",AnnotGPL = T,getGPL = T)
+ids <- fData(gset$GSE11121_series_matrix.txt.gz)
+ids <- ids[,c("ID","Gene symbol")]
+colnames(ids) <- c("probe_id","symbol")
+ids <- ids[ids$symbol!="",]
+
 length(unique(ids$symbol))
 tail(sort(table(ids$symbol)))
 table(sort(table(ids$symbol)))
 plot(table(sort(table(ids$symbol))))
 
-table(rownames(exprSet) %in% ids$probe_id)
-dim(exprSet)
-exprSet=exprSet[rownames(exprSet) %in% ids$probe_id,]
-dim(exprSet)
-
-ids=ids[match(rownames(exprSet),ids$probe_id),]
-head(ids)
-exprSet[1:5,1:5]
 exprSet=log2(exprSet)
+range(exprSet)
 
-jimmy <- function(exprSet,ids){
-  tmp = by(exprSet,
-           ids$symbol,
-           function(x) rownames(x)[which.max(rowMeans(x))] )
-  probes = as.character(tmp)
-  print(dim(exprSet))
-  exprSet=exprSet[rownames(exprSet) %in% probes ,]
-  
-  print(dim(exprSet))
-  rownames(exprSet)=ids[match(rownames(exprSet),ids$probe_id),2]
-  return(exprSet)
-}
-
-new_exprSet <- jimmy(exprSet,ids)
-
+exprSet <- as.data.frame(exprSet)
+exprSet$probe_id <- rownames(exprSet)
+exprSet <- merge(exprSet,ids,by="probe_id",all=F)
+sub <- exprSet[,-c(1,202)]
+symbol <- list(exprSet$symbol)
+exprSet <- aggregate(x = sub,by = symbol,FUN = mean)
+rownames(exprSet) <- exprSet$Group.1
+exprSet <- exprSet[,-1]
+new_exprSet <- as.matrix(exprSet)
 save(new_exprSet,phe,
      file='GSE11121_new_exprSet.Rdata')
 
 load(file='GSE11121_new_exprSet.Rdata')
 exprSet=new_exprSet
+rm(new_exprSet)
 
 colnames(phe)
 group_list=phe[,1]

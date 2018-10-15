@@ -14,6 +14,7 @@ rm(list=ls())
 
 load(file='GSE11121_new_exprSet.Rdata')
 exprSet=new_exprSet
+rm(new_exprSet)
 dim(exprSet)
 colnames(phe)
 group_list=phe[,1]
@@ -54,50 +55,22 @@ deg = function(exprSet,design,contrast.matrix){
 }
 
 re = deg(exprSet,design,contrast.matrix)
+DEG <- re
 
 
-nrDEG=re
-## heatmap
-library(pheatmap)
-choose_gene=head(rownames(nrDEG),50) ## 50 maybe better
-choose_matrix=exprSet[choose_gene,]
-choose_matrix=t(scale(t(choose_matrix)))
-pheatmap(choose_matrix,filename = 'DEG_top50_heatmap.png')
-
-
-library(ggplot2)
-
-
-## volcano plot
-colnames(nrDEG)
-plot(nrDEG$logFC,-log10(nrDEG$P.Value))
-
-DEG=nrDEG
-
-
-logFC_cutoff <- with(DEG,mean(abs( logFC)) + 2*sd(abs( logFC)) )
-# logFC_cutoff=1
+logFC_cutoff <- with(DEG,mean(abs(logFC)) + 2*sd(abs(logFC)) )
+#或者自定义cutoff
+logFC_cutoff=1
 
 DEG$change = as.factor(ifelse(DEG$P.Value < 0.05 & abs(DEG$logFC) > logFC_cutoff,
                               ifelse(DEG$logFC > logFC_cutoff ,'UP','DOWN'),'NOT')
 )
-this_tile <- paste0('Cutoff for logFC is ',round(logFC_cutoff,3),
-                    '\nThe number of up gene is ',nrow(DEG[DEG$change =='UP',]) ,
-                    '\nThe number of down gene is ',nrow(DEG[DEG$change =='DOWN',])
-)
+this_tile <- paste(paste0('Cutoff for logFC is ',round(logFC_cutoff,3)),
+                   paste0('The number of up gene is ',nrow(DEG[DEG$change =='UP',])),
+                   paste0('The number of down gene is ',nrow(DEG[DEG$change =='DOWN',])),
+                   sep = "\n")
 
-g = ggplot(data=DEG, 
-           aes(x=logFC, y=-log10(P.Value), 
-               color=change)) +
-  geom_point(alpha=0.4, size=1.75) +
-  theme_set(theme_set(theme_bw(base_size=20)))+
-  xlab("log2 fold change") + ylab("-log10 p-value") +
-  ggtitle( this_tile ) + theme(plot.title = element_text(size=15,hjust = 0.5))+
-  scale_colour_manual(values = c('blue','black','red')) ## corresponding to the levels(res$change)
-print(g)
-ggsave(g,filename = 'volcano.png')
- 
-save(new_exprSet,group_list,nrDEG,DEG, 
+save(exprSet,group_list,DEG, 
      file='GSE11121_DEG.Rdata')
 
 

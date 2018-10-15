@@ -14,8 +14,8 @@ rm(list=ls())
 if(F){
   library(GEOquery)
   gset <- getGEO('GSE11121', destdir=".",
-                 AnnotGPL = F,
-                 getGPL = F)
+                 AnnotGPL = T,
+                 getGPL = T)
   save(gset,file='GSE11121_eSet.Rdata')
 }
 load('GSE11121_eSet.Rdata')
