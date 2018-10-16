@@ -14,11 +14,23 @@ rm(list=ls())
 load(file='GSE11121_DEG.Rdata')
 source('functions.R')
 library(ggplot2)
+#ID conversion, use:
 library(clusterProfiler)
 library(org.Hs.eg.db)
+keytypes(org.Hs.eg.db)
 df <- bitr(rownames(DEG), fromType = "SYMBOL",
            toType = c( "ENTREZID"),
            OrgDb = org.Hs.eg.db)
+#or:
+library(dplyr)
+library(annotables)
+colnames(grch38)
+DEG$gene <- rownames(DEG)
+df <- dplyr::inner_join(DEG,grch38,by=c("gene"="symbol"))
+df <- dplyr::select(df,logFC:entrez)
+
+
+
 head(df)
 head(DEG)
 DEG$SYMBOL = rownames(DEG)
