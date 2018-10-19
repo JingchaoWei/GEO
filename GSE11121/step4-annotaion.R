@@ -12,7 +12,6 @@ rm(list=ls())
 ### ---------------
 
 load(file='GSE11121_DEG.Rdata')
-source('functions.R')
 library(ggplot2)
 #ID conversion, use:
 library(clusterProfiler)
@@ -21,53 +20,57 @@ keytypes(org.Hs.eg.db)
 df <- bitr(rownames(DEG), fromType = "SYMBOL",
            toType = c( "ENTREZID"),
            OrgDb = org.Hs.eg.db)
+unique(duplicated(df$SYMBOL))
+isTRUE(nrow(df)==nrow(DEG))
+DEG$SYMBOL = rownames(DEG)
+head(df)
+head(DEG)
+DEG=merge(DEG,df,by='SYMBOL')
+head(DEG)
 #or:
 library(dplyr)
 library(annotables)
 colnames(grch38)
-DEG$gene <- rownames(DEG)
-df <- dplyr::inner_join(DEG,grch38,by=c("gene"="symbol"))
-df <- dplyr::select(df,logFC:entrez)
+DEG$SYMBOL <- rownames(DEG)
+df <- dplyr::inner_join(DEG,grch38,by=c("SYMBOL"="symbol"))
+DEG <- dplyr::select(df,logFC:entrez)
 
-
-
-head(df)
-head(DEG)
-DEG$SYMBOL = rownames(DEG)
-DEG=merge(DEG,df,by='SYMBOL')
-head(DEG)
-
-gene_up= DEG[DEG$change == 'UP','ENTREZID'] 
-gene_down=DEG[DEG$change == 'DOWN','ENTREZID'] 
+gene_up= DEG[DEG$change == 'UP','entrez'] 
+gene_down=DEG[DEG$change == 'DOWN','entrez'] 
 gene_diff=c(gene_up,gene_down)
-gene_all=as.character(DEG[ ,'ENTREZID'] )
-data(geneList, package="DOSE")
-head(geneList)
-boxplot(geneList)
+gene_all=as.character(DEG[ ,'entrez'] )
+
 boxplot(DEG$logFC)
 
+#geneList contains three features:
+#numeric vector: fold change or other type of numerical variable
+#named vector: every number has a name, the corresponding gene ID
+#sorted vector: number should be sorted in decreasing order
 geneList=DEG$logFC
-names(geneList)=DEG$ENTREZID
+names(geneList)=as.character(DEG$entrez)
 geneList=sort(geneList,decreasing = T)
 
 
 ## KEGG pathway analysis
 if(T){
   ###   over-representation test
+  library(clusterProfiler)
   kk.up <- enrichKEGG(gene         = gene_up,
                       organism     = 'hsa',
                       universe     = gene_all,
-                      pvalueCutoff = 0.9,
-                      qvalueCutoff =0.9)
+                      pvalueCutoff = 0.05,
+                      qvalueCutoff =0.05)
   head(kk.up)[,1:6]
   kk.down <- enrichKEGG(gene         =  gene_down,
                         organism     = 'hsa',
                         universe     = gene_all,
-                        pvalueCutoff = 0.05)
+                        pvalueCutoff = 0.05,
+                        qvalueCutoff = 0.05)
   head(kk.down)[,1:6]
   kk.diff <- enrichKEGG(gene         = gene_diff,
                         organism     = 'hsa',
-                        pvalueCutoff = 0.05)
+                        pvalueCutoff = 0.05,
+                        qvalueCutoff = 0.05)
   head(kk.diff)[,1:6]
   
   kegg_diff_dt <- as.data.frame(kk.diff)
@@ -75,13 +78,28 @@ if(T){
   kegg_up_dt <- as.data.frame(kk.up)
   down_kegg<-kegg_down_dt[kegg_down_dt$pvalue<0.05,];down_kegg$group=-1
   up_kegg<-kegg_up_dt[kegg_up_dt$pvalue<0.05,];up_kegg$group=1
-
+  #used defined function
+  source('functions.R')
   g_kegg=kegg_plot(up_kegg,down_kegg)
   print(g_kegg)
+  #or show the function in detail:
+  dat=rbind(up_kegg,down_kegg)
+  colnames(dat)
+  dat$pvalue = -log10(dat$pvalue)
+  dat$pvalue=dat$pvalue*dat$group 
+  dat=dat[order(dat$pvalue,decreasing = F),]
+  g_kegg<- ggplot(dat, aes(x=reorder(Description,order(pvalue, decreasing = F)), y=pvalue, fill=group)) + 
+    geom_bar(stat="identity") + 
+    scale_fill_gradient(low="blue",high="red",guide = FALSE) + 
+    scale_x_discrete(name ="Pathway names") +
+    scale_y_continuous(name ="log10P-value") +
+    coord_flip() + theme_bw()+theme(plot.title = element_text(hjust = 0.5))+
+    ggtitle("Pathway Enrichment") 
 
   ggsave(g_kegg,filename = 'kegg_up_down.png')
   
   ###  GSEA 
+  library(clusterProfiler)
   kk_gse <- gseKEGG(geneList     = geneList,
                     organism     = 'hsa',
                     nPerm        = 1000,
@@ -95,6 +113,20 @@ if(T){
   up_kegg<-kk_gse[kk_gse$pvalue<0.05 & kk_gse$enrichmentScore > 0,];up_kegg$group=1
   
   g_kegg=kegg_plot(up_kegg,down_kegg)
+  #or:
+  dat=rbind(up_kegg,down_kegg)
+  colnames(dat)
+  dat$pvalue = -log10(dat$pvalue)
+  dat$pvalue=dat$pvalue*dat$group 
+  dat=dat[order(dat$pvalue,decreasing = F),]
+  g_kegg<- ggplot(dat, aes(x=reorder(Description,order(pvalue, decreasing = F)), y=pvalue, fill=group)) + 
+    geom_bar(stat="identity") + 
+    scale_fill_gradient(low="blue",high="red",guide = FALSE) + 
+    scale_x_discrete(name ="Pathway names") +
+    scale_y_continuous(name ="log10P-value") +
+    coord_flip() + theme_bw()+theme(plot.title = element_text(hjust = 0.5))+
+    ggtitle("Pathway Enrichment") 
+  
   print(g_kegg)
   ggsave(g_kegg,filename = 'kegg_up_down_gsea.png')
   
